@@ -1,0 +1,176 @@
+// Demo spec served by the mock backend. Mirrors what e.g. ASP.NET / Springdoc generate.
+
+const problem = (description: string) => ({
+  description,
+  content: { 'application/problem+json': { schema: { $ref: '#/components/schemas/ProblemDetails' } } },
+});
+
+const idParam = { name: 'id', in: 'path', required: true, schema: { type: 'integer', format: 'int32' } };
+
+const json = (ref: string, array = false) => ({
+  'application/json': { schema: array ? { type: 'array', items: { $ref: ref } } : { $ref: ref } },
+});
+
+export const spec = {
+  openapi: '3.0.3',
+  info: { title: 'Shop Demo API', version: '1.0.0', description: 'In-memory demo backend for Improved Swagger.' },
+  servers: [{ url: '/mock-api' }],
+  tags: [{ name: 'Products' }, { name: 'Categories' }, { name: 'System' }],
+  paths: {
+    '/api/products': {
+      get: {
+        tags: ['Products'],
+        summary: 'List all products',
+        operationId: 'getProducts',
+        parameters: [
+          { name: 'search', in: 'query', schema: { type: 'string' }, description: 'Filter by name' },
+          { name: 'categoryId', in: 'query', schema: { type: 'integer' } },
+        ],
+        responses: { 200: { description: 'OK', content: json('#/components/schemas/ProductDto', true) } },
+      },
+      post: {
+        tags: ['Products'],
+        summary: 'Create a product',
+        operationId: 'createProduct',
+        requestBody: { required: true, content: json('#/components/schemas/CreateProductDto') },
+        responses: {
+          201: { description: 'Created', content: json('#/components/schemas/ProductDto') },
+          400: problem('Validation failed'),
+        },
+      },
+    },
+    '/api/products/{id}': {
+      get: {
+        tags: ['Products'],
+        summary: 'Get a product by id',
+        operationId: 'getProduct',
+        parameters: [idParam],
+        responses: { 200: { description: 'OK', content: json('#/components/schemas/ProductDto') }, 404: problem('Not found') },
+      },
+      put: {
+        tags: ['Products'],
+        summary: 'Update a product',
+        operationId: 'updateProduct',
+        parameters: [idParam],
+        requestBody: { required: true, content: json('#/components/schemas/UpdateProductDto') },
+        responses: {
+          200: { description: 'OK', content: json('#/components/schemas/ProductDto') },
+          400: problem('Validation failed'),
+          404: problem('Not found'),
+        },
+      },
+      delete: {
+        tags: ['Products'],
+        summary: 'Delete a product',
+        operationId: 'deleteProduct',
+        parameters: [idParam],
+        responses: { 204: { description: 'Deleted' }, 404: problem('Not found') },
+      },
+    },
+    '/api/categories': {
+      get: {
+        tags: ['Categories'],
+        summary: 'List all categories',
+        operationId: 'getCategories',
+        responses: { 200: { description: 'OK', content: json('#/components/schemas/CategoryDto', true) } },
+      },
+      post: {
+        tags: ['Categories'],
+        summary: 'Create a category',
+        operationId: 'createCategory',
+        requestBody: { required: true, content: json('#/components/schemas/CreateCategoryDto') },
+        responses: { 201: { description: 'Created', content: json('#/components/schemas/CategoryDto') }, 400: problem('Validation failed') },
+      },
+    },
+    '/api/health': {
+      get: {
+        tags: ['System'],
+        summary: 'Health check',
+        responses: {
+          200: {
+            description: 'OK',
+            content: { 'application/json': { schema: { type: 'object', properties: { status: { type: 'string', example: 'Healthy' } } } } },
+          },
+        },
+      },
+    },
+  },
+  components: {
+    schemas: {
+      Dimensions: {
+        type: 'object',
+        properties: {
+          width: { type: 'number', example: 30 },
+          height: { type: 'number', example: 2 },
+          depth: { type: 'number', example: 20 },
+        },
+      },
+      ProductDto: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', format: 'int32', readOnly: true },
+          name: { type: 'string', example: 'Laptop' },
+          description: { type: 'string', nullable: true },
+          price: { type: 'number', format: 'double', example: 999.99 },
+          currency: { type: 'string', enum: ['EUR', 'USD', 'GBP'] },
+          categoryId: { type: 'integer', format: 'int32', example: 1 },
+          tags: { type: 'array', items: { type: 'string' } },
+          stock: { type: 'integer', format: 'int32', example: 10 },
+          dimensions: { $ref: '#/components/schemas/Dimensions' },
+          createdAt: { type: 'string', format: 'date-time', readOnly: true },
+        },
+      },
+      CreateProductDto: {
+        type: 'object',
+        required: ['name', 'price'],
+        properties: {
+          id: { type: 'integer', format: 'int32', readOnly: true, description: 'Generated by the database' },
+          name: { type: 'string', example: 'Laptop' },
+          description: { type: 'string', nullable: true },
+          price: { type: 'number', format: 'double', example: 999.99 },
+          currency: { type: 'string', enum: ['EUR', 'USD', 'GBP'] },
+          categoryId: { type: 'integer', format: 'int32', example: 1 },
+          tags: { type: 'array', items: { type: 'string' } },
+          stock: { type: 'integer', format: 'int32', example: 10 },
+          dimensions: { $ref: '#/components/schemas/Dimensions' },
+        },
+      },
+      UpdateProductDto: {
+        type: 'object',
+        required: ['name', 'price'],
+        properties: {
+          name: { type: 'string' },
+          description: { type: 'string', nullable: true },
+          price: { type: 'number', format: 'double' },
+          currency: { type: 'string', enum: ['EUR', 'USD', 'GBP'] },
+          categoryId: { type: 'integer', format: 'int32' },
+          tags: { type: 'array', items: { type: 'string' } },
+          stockQuantity: { type: 'integer', format: 'int32', description: 'Called "stock" in ProductDto' },
+          dimensions: { $ref: '#/components/schemas/Dimensions' },
+        },
+      },
+      CategoryDto: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', format: 'int32', readOnly: true },
+          name: { type: 'string', example: 'Electronics' },
+        },
+      },
+      CreateCategoryDto: {
+        type: 'object',
+        required: ['name'],
+        properties: { name: { type: 'string', example: 'Electronics' } },
+      },
+      ProblemDetails: {
+        type: 'object',
+        properties: {
+          type: { type: 'string', nullable: true },
+          title: { type: 'string', nullable: true },
+          status: { type: 'integer', format: 'int32', nullable: true },
+          detail: { type: 'string', nullable: true },
+          errors: { type: 'object', additionalProperties: { type: 'array', items: { type: 'string' } } },
+        },
+      },
+    },
+  },
+};
