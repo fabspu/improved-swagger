@@ -4,7 +4,7 @@ import { initialBody } from './body/initial';
 import { fromValue, mergeDisabled, setEnabled, setValueAtDotPath, toValue } from './body/tree';
 import { applyMapping, fieldCandidates, pathParamValues } from './mapping';
 import { autoMatch, flattenFields } from './openapi/fields';
-import { extractOperations, schemaByName, type OpenApiDoc } from './openapi/spec';
+import { extractOperations, normalizeSpecUrl, schemaByName, type OpenApiDoc } from './openapi/spec';
 import type { CapturedObject, Mapping } from './store';
 
 const doc = spec as unknown as OpenApiDoc;
@@ -73,5 +73,13 @@ describe('mapping', () => {
   it('lists per-field candidates', () => {
     const c = fieldCandidates([mapping], [product], 'UpdateProductDto', 'stockQuantity');
     expect(c.map((x) => x.value)).toEqual([3]);
+  });
+});
+
+describe('normalizeSpecUrl', () => {
+  it('adds http:// to pasted host:port URLs and keeps full URLs and paths', () => {
+    expect(normalizeSpecUrl(' localhost:8080/v3/api-docs ')).toBe('http://localhost:8080/v3/api-docs');
+    expect(normalizeSpecUrl('https://localhost:7001/swagger/v1/swagger.json')).toBe('https://localhost:7001/swagger/v1/swagger.json');
+    expect(normalizeSpecUrl('/mock-api/openapi.json')).toBe('/mock-api/openapi.json');
   });
 });

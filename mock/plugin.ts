@@ -1,4 +1,6 @@
+import http from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import https from 'node:https';
 import type { Connect, Plugin } from 'vite';
 import { spec } from './openapi.ts';
 
@@ -107,32 +109,49 @@ const mockApi: Connect.NextHandleFunction = async (req, res, next) => {
   return problem(res, 404, `No route for ${method} ${path}`);
 };
 
-const HOP_BY_HOP = ['host', 'connection', 'content-length', 'transfer-encoding', 'origin', 'referer', 'x-proxy-target', 'accept-encoding'];
+const STRIP_REQUEST = ['host', 'connection', 'content-length', 'transfer-encoding', 'origin', 'referer', 'x-proxy-target', 'accept-encoding'];
+const STRIP_RESPONSE = ['connection', 'keep-alive', 'transfer-encoding'];
 
 /**
  * Dev-only relay so the UI can call APIs on other origins without CORS headers.
- * The target URL comes from the `x-proxy-target` header.
+ * The target URL comes from the `x-proxy-target` header. Certificates are not verified for loopback
+ * targets, because local backends (e.g. ASP.NET) typically use a self-signed dev certificate.
  */
 const proxy: Connect.NextHandleFunction = async (req, res, next) => {
   if (!req.url?.startsWith('/__proxy')) return next();
   const target = req.headers['x-proxy-target'];
-  if (typeof target !== 'string' || !/^https?:\/\//.test(target)) return problem(res, 400, 'Missing or invalid x-proxy-target header');
+  let url: URL;
+  try {
+    url = new URL(String(target));
+    if (!/^https?:$/.test(url.protocol)) throw new Error('unsupported protocol');
+  } catch {
+    return problem(res, 400, 'Missing or invalid x-proxy-target header');
+  }
 
   const headers: Record<string, string> = {};
   for (const [k, v] of Object.entries(req.headers)) {
-    if (typeof v === 'string' && !HOP_BY_HOP.includes(k)) headers[k] = v;
+    if (typeof v === 'string' && !STRIP_REQUEST.includes(k)) headers[k] = v;
   }
-  const body = ['GET', 'HEAD'].includes(req.method ?? 'GET') ? undefined : new Uint8Array(await readBody(req));
-  try {
-    const upstream = await fetch(target, { method: req.method, headers, body, redirect: 'manual' });
-    res.statusCode = upstream.status;
-    upstream.headers.forEach((value, key) => {
-      if (!['content-encoding', 'content-length', 'transfer-encoding', 'connection'].includes(key)) res.setHeader(key, value);
-    });
-    res.end(Buffer.from(await upstream.arrayBuffer()));
-  } catch (e) {
-    problem(res, 502, `Proxy request to ${target} failed: ${String(e)}`);
-  }
+  const body = ['GET', 'HEAD'].includes(req.method ?? 'GET') ? undefined : await readBody(req);
+  if (body?.length) headers['content-length'] = String(body.length);
+
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) || url.hostname.endsWith('.localhost');
+  const request = (url.protocol === 'https:' ? https : http).request(
+    url,
+    { method: req.method, headers, rejectUnauthorized: !loopback },
+    (upstream) => {
+      res.statusCode = upstream.statusCode ?? 502;
+      for (const [key, value] of Object.entries(upstream.headers)) {
+        if (value !== undefined && !STRIP_RESPONSE.includes(key)) res.setHeader(key, value);
+      }
+      upstream.pipe(res);
+    },
+  );
+  request.on('error', (e) => {
+    if (res.headersSent) return res.destroy();
+    problem(res, 502, `Proxy request to ${url.origin} failed: ${e.message}`);
+  });
+  request.end(body);
 };
 
 export function devServerPlugin(): Plugin {

@@ -178,22 +178,6 @@ kbd {
 .brand span {
   color: var(--accent);
 }
-.spec-form {
-  display: flex;
-  gap: 6px;
-  flex: 1;
-  max-width: 640px;
-}
-.spec-form input {
-  flex: 1;
-}
-.spec-title {
-  font-weight: 600;
-}
-.settings-anchor {
-  position: relative;
-  margin-left: auto;
-}
 .popover {
   position: absolute;
   z-index: 50;
@@ -201,26 +185,6 @@ kbd {
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-}
-.popover.settings {
-  right: 0;
-  top: calc(100% + 6px);
-  width: 360px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.popover.settings label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.popover.settings label.row {
-  flex-direction: row;
-  align-items: flex-start;
 }
 
 .banner {
@@ -892,4 +856,57 @@ table.mapper .arrow {
 }
 .menu-id {
   margin-left: auto;
+}
+
+/* ---- API list / dialogs --------------------------------------------- */
+
+.api-select {
+  min-width: 180px;
+  max-width: 280px;
+  font-weight: 600;
+}
+.welcome {
+  max-width: 640px;
+  margin: 12vh auto 0;
+  padding: 0 16px;
+}
+.add-api {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.add-api-row {
+  display: flex;
+  gap: 8px;
+}
+.add-api-row input {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.add-api-extras {
+  display: flex;
+  gap: 6px;
+}
+.add-api-optional {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.form label.row {
+  flex-direction: row;
+  align-items: flex-start;
 }

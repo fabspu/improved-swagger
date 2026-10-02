@@ -1,7 +1,7 @@
 import { initialBody } from './body/initial';
 import { toValue } from './body/tree';
 import { baseUrl, dtoName, responseFor, type OpenApiDoc, type Operation } from './openapi/spec';
-import { captureObjects, getState, setState, type ExecResult } from './store';
+import { captureObjects, getActiveApi, getState, setState, type ExecResult } from './store';
 
 /** Name under which the request body of an operation is mapped (the DTO name, or a synthetic one for inline schemas). */
 export function targetDtoOf(doc: OpenApiDoc, op: Operation): string {
@@ -9,8 +9,8 @@ export function targetDtoOf(doc: OpenApiDoc, op: Operation): string {
 }
 
 export function buildUrl(doc: OpenApiDoc, op: Operation, params: Record<string, string>): string {
-  const { settings, specUrl } = getState();
-  const base = settings.baseUrlOverride.trim().replace(/\/$/, '') || baseUrl(doc, specUrl);
+  const api = getActiveApi();
+  const base = api?.baseUrl.trim().replace(/\/$/, '') || baseUrl(doc, api?.specUrl ?? location.href);
   const path = op.path.replace(/\{([^}]+)\}/g, (_, name: string) => encodeURIComponent(params[`path:${name}`] ?? ''));
   const query = new URLSearchParams();
   for (const p of op.parameters) {
@@ -22,7 +22,8 @@ export function buildUrl(doc: OpenApiDoc, op: Operation, params: Record<string, 
 }
 
 export async function execute(doc: OpenApiDoc, op: Operation): Promise<void> {
-  const { settings, drafts } = getState();
+  const { useProxy, drafts } = getState();
+  const api = getActiveApi();
   const draft = drafts[op.id] ?? { params: {} };
   const url = buildUrl(doc, op, draft.params);
 
@@ -31,7 +32,7 @@ export async function execute(doc: OpenApiDoc, op: Operation): Promise<void> {
     const v = draft.params[`header:${p.name}`];
     if (p.in === 'header' && v) headers[p.name] = v;
   }
-  if (settings.bearerToken.trim()) headers.Authorization = `Bearer ${settings.bearerToken.trim()}`;
+  if (api?.bearerToken.trim()) headers.Authorization = `Bearer ${api.bearerToken.trim()}`;
 
   let body: string | undefined;
   const bodyNode = draft.body ?? initialBody(doc, op);
@@ -42,7 +43,7 @@ export async function execute(doc: OpenApiDoc, op: Operation): Promise<void> {
 
   // Cross-origin APIs usually lack CORS headers for this UI, so the dev server relays the request.
   const crossOrigin = new URL(url, location.href).origin !== location.origin;
-  const viaProxy = settings.useProxy && crossOrigin;
+  const viaProxy = useProxy && crossOrigin;
   const started = performance.now();
   let result: ExecResult;
   try {

@@ -1,81 +1,50 @@
-import { useEffect, useState } from 'react';
-import { applyUploadedSpec, loadSpec } from '../App';
-import { setState, useStore } from '../store';
+import { useState } from 'react';
+import { loadActiveSpec, switchApi } from '../apis';
+import { useStore } from '../store';
+import { AddApiDialog, ApiSettingsDialog } from './ApiDialogs';
 
 export function TopBar() {
-  const specUrl = useStore((s) => s.specUrl);
+  const apis = useStore((s) => s.apis);
+  const activeId = useStore((s) => s.activeApiId);
+  const loading = useStore((s) => s.specLoading);
   const info = useStore((s) => s.doc?.info);
-  const settings = useStore((s) => s.settings);
-  const [url, setUrl] = useState(specUrl);
-  useEffect(() => setUrl(specUrl), [specUrl]);
-  const [showSettings, setShowSettings] = useState(false);
-
-  const onFile = async (file: File) => {
-    try {
-      applyUploadedSpec(await file.text(), file.name);
-      setUrl(`upload:${file.name}`);
-    } catch (e) {
-      setState({ specError: `Could not parse ${file.name}: ${String(e)}` });
-    }
-  };
+  const [dialog, setDialog] = useState<'add' | 'settings'>();
 
   return (
     <header className="topbar">
       <div className="brand">
         Improved<span>Swagger</span>
       </div>
-      <form
-        className="spec-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void loadSpec(url);
-        }}
-      >
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="URL to openapi.json / swagger.json" />
-        <button type="submit">Load</button>
-        <label className="button ghost">
-          Upload…
-          <input type="file" accept=".json,application/json" hidden onChange={(e) => e.target.files?.[0] && void onFile(e.target.files[0])} />
-        </label>
-      </form>
-      {info && (
-        <div className="spec-title" title={info.description}>
-          {info.title} <span className="muted">v{info.version}</span>
-        </div>
+      {apis.length > 0 && (
+        <select className="api-select" value={activeId} onChange={(e) => switchApi(e.target.value)} aria-label="Active API">
+          {apis.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>
       )}
-      <div className="settings-anchor">
-        <button className="ghost" onClick={() => setShowSettings((v) => !v)}>
-          ⚙ Settings
+      <button className="small" onClick={() => setDialog('add')}>
+        ＋ Add API
+      </button>
+      {activeId && (
+        <button className="ghost small" onClick={() => void loadActiveSpec()} disabled={loading} title="Reload the spec">
+          {loading ? '…' : '⟳'}
         </button>
-        {showSettings && (
-          <div className="popover settings">
-            <label>
-              Base URL override
-              <input
-                value={settings.baseUrlOverride}
-                placeholder="taken from the spec's servers"
-                onChange={(e) => setState({ settings: { ...settings, baseUrlOverride: e.target.value } })}
-              />
-            </label>
-            <label>
-              Bearer token
-              <input
-                value={settings.bearerToken}
-                placeholder="sent as Authorization header"
-                onChange={(e) => setState({ settings: { ...settings, bearerToken: e.target.value } })}
-              />
-            </label>
-            <label className="row">
-              <input
-                type="checkbox"
-                checked={settings.useProxy}
-                onChange={(e) => setState({ settings: { ...settings, useProxy: e.target.checked } })}
-              />
-              Route cross-origin requests through the dev-server proxy (avoids CORS)
-            </label>
-          </div>
-        )}
-      </div>
+      )}
+      {info && (
+        <span className="muted small" title={info.description}>
+          v{info.version}
+        </span>
+      )}
+      <span className="spacer" />
+      {activeId && (
+        <button className="ghost" onClick={() => setDialog('settings')}>
+          ⚙ API settings
+        </button>
+      )}
+      {dialog === 'add' && <AddApiDialog onClose={() => setDialog(undefined)} />}
+      {dialog === 'settings' && <ApiSettingsDialog onClose={() => setDialog(undefined)} />}
     </header>
   );
 }

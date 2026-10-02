@@ -258,10 +258,18 @@ export function groupByTag(doc: OpenApiDoc, ops: Operation[]): [string, Operatio
   return [...groups].filter(([, list]) => list.length > 0);
 }
 
+/** Accepts what people paste: `localhost:8080/v3/api-docs` gets an `http://` prefix; `/path` and full URLs stay as they are. */
+export function normalizeSpecUrl(input: string): string {
+  const url = input.trim();
+  if (url.startsWith('/') || /^[a-z][a-z0-9+.-]*:\/\//i.test(url)) return url;
+  return `http://${url}`;
+}
+
 export function baseUrl(doc: OpenApiDoc, specUrl: string): string {
   const origin = (() => {
     try {
-      return new URL(specUrl, window.location.href);
+      // uploaded specs have no origin of their own
+      return new URL(specUrl.startsWith('upload:') ? window.location.href : specUrl, window.location.href);
     } catch {
       return new URL(window.location.href);
     }

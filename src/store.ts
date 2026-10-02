@@ -36,42 +36,85 @@ export interface ExecResult {
   error?: string;
 }
 
-export interface Settings {
-  baseUrlOverride: string;
+/** A registered API: a spec URL plus the per-API connection settings. */
+export interface ApiEntry {
+  id: string;
+  name: string;
+  /** http(s) URL of the spec, a path on this origin, or `upload:<file name>` for an uploaded file. */
+  specUrl: string;
+  /** Overrides the base URL derived from the spec's `servers`. */
+  baseUrl: string;
   bearerToken: string;
-  useProxy: boolean;
 }
 
-export interface AppState {
-  specUrl: string;
-  doc?: OpenApiDoc;
-  specError?: string;
+/** Everything that belongs to one API. Stored per API so DTOs of different backends never mix. */
+export interface ApiData {
   selectedOpId?: string;
-  settings: Settings;
   captured: CapturedObject[];
   mappings: Mapping[];
   drafts: Record<string, OperationDraft>;
+}
+
+export interface AppState extends ApiData {
+  apis: ApiEntry[];
+  activeApiId?: string;
+  useProxy: boolean;
+  doc?: OpenApiDoc;
+  specError?: string;
+  specLoading: boolean;
   results: Record<string, ExecResult>;
 }
 
-const STORAGE_KEY = 'improved-swagger:v1';
-const PERSISTED: (keyof AppState)[] = ['specUrl', 'selectedOpId', 'settings', 'captured', 'mappings', 'drafts'];
+const MAIN_KEY = 'improved-swagger:v2';
+const dataKey = (id: string) => `${MAIN_KEY}:data:${id}`;
+export const specKey = (id: string) => `${MAIN_KEY}:spec:${id}`;
+const MAIN_FIELDS = ['apis', 'activeApiId', 'useProxy'] as const;
+const DATA_FIELDS = ['selectedOpId', 'captured', 'mappings', 'drafts'] as const;
+
+function readJson<T>(key: string): T | undefined {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeJson(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // storage full or unavailable: keep working in memory
+  }
+}
+
+export const emptyData = (): ApiData => ({ selectedOpId: undefined, captured: [], mappings: [], drafts: {} });
+
+export function loadApiData(id: string): ApiData {
+  return { ...emptyData(), ...readJson<Partial<ApiData>>(dataKey(id)) };
+}
+
+export function deleteApiStorage(id: string): void {
+  try {
+    localStorage.removeItem(dataKey(id));
+    localStorage.removeItem(specKey(id));
+  } catch {
+    // ignore
+  }
+}
 
 function load(): AppState {
-  const initial: AppState = {
-    specUrl: '/mock-api/openapi.json',
-    settings: { baseUrlOverride: '', bearerToken: '', useProxy: true },
-    captured: [],
-    mappings: [],
-    drafts: {},
+  const main = readJson<{ apis?: ApiEntry[]; activeApiId?: string; useProxy?: boolean }>(MAIN_KEY) ?? {};
+  const apis = main.apis ?? [];
+  const activeApiId = apis.some((a) => a.id === main.activeApiId) ? main.activeApiId : apis[0]?.id;
+  return {
+    apis,
+    activeApiId,
+    useProxy: main.useProxy ?? true,
+    specLoading: false,
     results: {},
+    ...(activeApiId ? loadApiData(activeApiId) : emptyData()),
   };
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
-    return { ...initial, ...saved, settings: { ...initial.settings, ...saved.settings } };
-  } catch {
-    return initial;
-  }
 }
 
 let state = load();
@@ -81,15 +124,18 @@ export function getState(): AppState {
   return state;
 }
 
+export function getActiveApi(): ApiEntry | undefined {
+  return state.apis.find((a) => a.id === state.activeApiId);
+}
+
 export function setState(update: Partial<AppState> | ((s: AppState) => Partial<AppState>)): void {
   const patch = typeof update === 'function' ? update(state) : update;
   state = { ...state, ...patch };
-  if (PERSISTED.some((k) => k in patch)) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(PERSISTED.map((k) => [k, state[k]]))));
-    } catch {
-      // storage full or unavailable: keep working in memory
-    }
+  if (MAIN_FIELDS.some((k) => k in patch)) {
+    writeJson(MAIN_KEY, { apis: state.apis, activeApiId: state.activeApiId, useProxy: state.useProxy });
+  }
+  if (state.activeApiId && DATA_FIELDS.some((k) => k in patch)) {
+    writeJson(dataKey(state.activeApiId), Object.fromEntries(DATA_FIELDS.map((k) => [k, state[k]])));
   }
   listeners.forEach((l) => l());
 }

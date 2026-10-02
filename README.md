@@ -12,7 +12,7 @@ npm install
 npm run dev        # http://localhost:5173 – lädt automatisch die Demo-API
 ```
 
-Eigene API: oben die URL zur Spec eintragen (z. B. `http://localhost:8080/v3/api-docs`) und **Load** – oder die JSON-Datei hochladen.
+Eigene API: URL der `openapi.json` einfügen (z. B. `localhost:8080/v3/api-docs`, das `http://` darf fehlen) und **Add** klicken – oder die JSON-Datei hochladen.
 
 Weitere Skripte: `npm test` (Unit-Tests), `npm run typecheck`, `npm run build`.
 
@@ -20,6 +20,7 @@ Weitere Skripte: `npm test` (Unit-Tests), `npm run typecheck`, `npm run build`.
 
 | Bereich | Funktion |
 |---|---|
+| **API-Liste (oben)** | Beliebig viele APIs registrieren und per Dropdown wechseln (immer eine aktiv). Name kommt aus `info.title`, ⟳ lädt die Spec neu, ⚙ API settings: Name, Spec-URL, Base-URL-Override, Bearer-Token, Entfernen. Zwischenspeicher, Mappings und Entwürfe sind **pro API getrennt**. Die Liste und alle Daten bleiben im Browser (`localStorage`) erhalten. |
 | **Endpunktliste (links)** | Gruppiert nach Tags wie in Swagger, Suchleiste (`/` fokussiert sie, mehrere Begriffe = UND), Filter-Chips pro HTTP-Methode. |
 | **Detailansicht (Mitte)** | Parameter, Request Body, Execute, Response, dokumentierte Responses – getrennt in Erfolg und **Error types** – jeweils mit Beispiel und Schema. |
 | **Request Body mit Checkboxen** | Der Beispiel-Body wird als JSON-Baum angezeigt; jedes Feld (und jedes Array-Item) hat links eine Checkbox. Deaktivierte Felder werden nicht gesendet. `readOnly`-Felder (z. B. `id`, `createdAt`) sind von Anfang an deaktiviert. Werte direkt inline editierbar, Enums als Dropdown, Umschalten auf Raw-JSON möglich. |
@@ -28,7 +29,7 @@ Weitere Skripte: `npm test` (Unit-Tests), `npm run typecheck`, `npm run build`.
 | **⇠ pro Feld** | Rechts neben jedem gemappten Feld: Hover zeigt die gecachten Objekte als `DTO-Name  feld: wert` – Klick übernimmt genau diesen Wert. |
 | **⤓ Fill from DTO** | Oben rechts am JSON: wendet alle gemappten Felder eines gecachten Objekts auf einmal an. Pfad-Parameter wie `{id}` / `{productId}` werden dabei gleich mitgesetzt. |
 | **Persistenz** | Mappings, Zwischenspeicher, Entwürfe pro Endpunkt und Einstellungen liegen im `localStorage` und überleben einen Reload. |
-| **CORS** | Requests an andere Origins laufen im Dev-Server über einen kleinen Proxy (`/__proxy`), damit man die API nicht extra für CORS konfigurieren muss. Abschaltbar unter ⚙ Settings, dort auch Base-URL-Override und Bearer-Token. |
+| **CORS / Proxy** | Das Laden der Spec und alle Requests an andere Origins laufen über einen kleinen Proxy im Dev-Server (`/__proxy`), damit die API nicht für CORS konfiguriert werden muss. Für `localhost`-Ziele werden selbstsignierte HTTPS-Zertifikate akzeptiert (typisch bei ASP.NET). Abschaltbar unter ⚙ API settings. |
 
 ### Beispiel-Flow mit der Demo-API
 
@@ -48,7 +49,8 @@ src/
   openapi/fields.ts    Schema → flache Feldliste (Punkt-Pfade), Auto-Match für Mappings
   body/tree.ts         Editierbarer JSON-Baum mit an/aus pro Feld
   mapping.ts           Mapping anwenden, Kandidaten pro Feld / pro Objekt
-  store.ts             Globaler State (Cache, Mappings, Drafts) + localStorage
+  store.ts             Globaler State (APIs; pro API: Cache, Mappings, Drafts) + localStorage
+  apis.ts              APIs hinzufügen/wechseln/entfernen, Spec laden (über den Proxy)
   request.ts           Request bauen/ausführen, Responses cachen
   components/          Sidebar, EndpointView, BodyEditor, MappingDialog, CapturePanel, …
 mock/                  Demo-API (In-Memory) + Dev-Proxy als Vite-Plugin
@@ -64,7 +66,9 @@ Zentrale Begriffe:
 - YAML-Specs, externe `$ref`s, `multipart/form-data` und andere Content-Types als JSON
 - Auth-Flows aus `securitySchemes` (aktuell nur ein globales Bearer-Token)
 - Mapping in Query-Parameter (Pfad-Parameter werden per Namens-Heuristik gefüllt)
-- Mehrere Environments (dev/staging) und Request-Historie
+- Spec-URL automatisch finden (aus der Basis-URL die üblichen Pfade wie `/v3/api-docs` oder `/swagger/v1/swagger.json` probieren)
+- Mehrere APIs gleichzeitig in einer Ansicht (aktuell: eine aktive API, Mappings gelten nur innerhalb einer API)
+- Request-Historie
 - Verschachtelte Objekte in Arrays mappen (aktuell: Arrays werden als Ganzes gemappt)
 - Response-Wrapper wie `{ items: [...], total }` beim Cachen auspacken
 - Ohne Dev-Server (statischer Build) gibt es weder Mock-API noch Proxy – dann braucht die Ziel-API CORS

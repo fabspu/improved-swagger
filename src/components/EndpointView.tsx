@@ -11,6 +11,7 @@ import { HoverMenu, JsonView, MethodBadge, StatusBadge } from './common';
 export function EndpointView({ doc, op }: { doc: OpenApiDoc; op: Operation }) {
   const params = useStore((s) => s.drafts[op.id]?.params ?? EMPTY);
   const result = useStore((s) => s.results[op.id]);
+  useStore((s) => s.apis.find((a) => a.id === s.activeApiId)?.baseUrl); // keeps the URL preview in sync with the API settings
   const [running, setRunning] = useState(false);
   const success = op.responses.filter((r) => /^[123]/.test(r.status));
   const errors = op.responses.filter((r) => !/^[123]/.test(r.status));
